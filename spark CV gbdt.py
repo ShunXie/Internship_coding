@@ -76,151 +76,10 @@ data_name_list = ['tc', 'ta', 'breakfast_tc', 'nonbreakfast_tc',\
 'kids_meal_toy_num', 'chicken_burger_soldratio_orlean', 'chicken_burger_soldratio_spicy', \
 'chicken_burger_soldratio_crusty']
 
-# %%
-label_list = ['ex1', 'ex2','ex3', 'ex4', 'ex5', 'ex6', 'ex7',
-                're1', 're2', 're3', 're4', 're5', 're6', 're7' ]
-
-# %%
-label_list = ['re1', 're2', 're3', 're4', 're5', 're6', 're7']
-
-# %%
-train_data = train_data.select(label_list + data_name_list)
-
-# %%
-vec_model = VectorAssembler(inputCols=data_name_list, outputCol='features')    
-
-# %%
-# trainSet = train_data.filter(fn.col(label) == 1).unionAll(train_data.filter(fn.col(label)==0).\
-#        withColumn('rand', fn.rand()).filter(fn.col('rand') <= prob).drop('rand'))
-
-# %%
-label_list = ['re1']
-
-# %%
-train_data = train_data.select(label_list + data_name_list)
-train_rdd = train_data.rdd.map(list)
-
-# %%
-#模型训练 7个label，每个单独预测一次，预测7次
-
-model_list = []
-for i, label in enumerate(label_list):
-    print(label)
-    trainSet = train_rdd.map(lambda x:Row(label=x[i], features=Vectors.dense(x[15:]))).toDF()
-    #负采样 按正样本与负样本2:3的比例负采样
-    pos_num = trainSet.filter(fn.col('label') == 1).count()
-    neg_num = trainSet.filter(fn.col('label') == 0).count()
-    prob = 1.5 * pos_num / neg_num
-    trainSet = trainSet.filter(fn.col('label') == 1).unionAll(trainSet.filter(fn.col('label')==0).withColumn('rand', fn.rand()).filter(fn.col('rand') <= prob).select('features', 'label'))
-
-    #trainSet.show()
-
-    stringIndexer = StringIndexer(inputCol='label', outputCol="indexed")
-    si_model = stringIndexer.fit(trainSet)
-    tf = si_model.transform(trainSet)
-
-    gbdt = GBTClassifier(maxIter=50, maxDepth=6,labelCol="indexed",seed=42)
-    gbdtModel = gbdt.fit(tf)
-    model_list.append(gbdtModel)
-
-# %%
-#cv调参
-def cv_
 
 
 # %%
-
-
-# %%
-
-
-# %%
-gbdtModel
-
-# %%
-id_col = ['yumid']
-
-# %%
-testRawdata = spark.sql("""select * from aie_kfc_cltv.cltv_muti_label_predata limit 10""") 
-test_data = testRawdata.select(data_name_list)
-test_id = testRawdata.select(id_col)
-index = fn.monotonically_increasing_id()
-test_id = test_id.withColumn('match_index', index)
-test_rdd = test_data.rdd.map(list)
-
-# %%
-schema = StructType([
-    StructField('yumid', StringType(), True), 
-    StructField('prediction_score', DoubleType(), True), 
-    StructField('daypart_name', StringType(), True)
-])
-
-predict_df = spark.createDataFrame(spark.sparkContext.emptyRDD(), schema)
-
-# %%
-
-for i, label in enumerate(label_list):
-    print(label)
-    testSet = test_rdd.map(lambda x:Row(features=Vectors.dense(x))).toDF()
-    predictResult = gbdtModel.transform(testSet)
-    predictResult = predictResult.withColumn('match_index', index)
-    predictResult = predictResult.select('prediction', 'match_index').join(test_id, test_id.match_index == predictResult.match_index, 'inner').drop(test_id.match_index).withColumn('daypart_name', fn.lit('Breakfast')).drop('match_index')
-    predictResult.show()
-    predict_df = predict_df.unionAll(predictResult)
-predict_df.write.format('hive').mode("overwrite").saveAsTable("aie_kfc_cltv.")
-
-# %%
-predict_df.show()
-
-# %%
-
-predictResult = predictResult.withColumn('match_index', index)
-predictResult.select('prediction', 'match_index').join(test_id, test_id.match_index == predictResult.match_index, 'inner').drop(test_id.match_index).withColumn('daypart_name', fn.lit('Breakfast')).drop('match_index').show()
-
-# %%
-pos_num = trainSet.filter(fn.col('label') == 1).count()
-neg_num = trainSet.filter(fn.col('label') == 0).count()
-prob = 1.5 * pos_num / neg_num
-
-# %%
-prob
-
-# %%
-trainSet.filter(fn.col('label') == 1).unionAll(trainSet.filter(fn.col('label')==0).withColumn('rand', fn.rand()).filter(fn.col('rand') <= prob).select('features', 'label')).show()
-
-# %%
-spark.sql("REFRESH TABLE aie_kfc_cltv.cltv_muti_label_predata ")
-
-# %%
-
-testRawdata = spark.sql("""select * from aie_kfc_cltv.cltv_muti_label_predata limit 1""") 
-
-
-# %%
-test_data = testRawdata.select(data_name_list + id_col)
-
-vec_model = VectorAssembler(inputCols=data_name_list, outputCol='features')
-testSet = vec_model.transform(test_data).select(id_col +['features'])
-
-# %%
-Predict = gbdtModel.transform(test_data)
-
-# %%
-Predict.select(['prediction'] + id_col).\
-            withColumn('daypart_name', fn.lit('bf')).withColumnRenamed('prediction', 'prediction_score').show()
-
-# %%
-whole_flow = Pipeline(stages=[vec_model, gbdtModel])
-predictResult = whole_flow.transform(test_data).select(id_col +['features'])
-
-# %%
-gbdtModel
-
-# %%
-predictResult_v2 = gbdtModel.transform(test_data)
-
-# %%
- #数据准备
+ #data perparation
 label_list = ['re1']
 train_data = spark.sql("""select * from aie_kfc_cltv.cltv_muti_label_traindata limit 10""") 
 train_data = train_data.select(label_list + data_name_list)
@@ -229,7 +88,7 @@ train_data = train_data.select(label_list + data_name_list)
 
 vec_model = VectorAssembler(inputCols=data_name_list, outputCol='features')    
 
-#模型训练
+#model training
 for i, label in enumerate(label_list):
     print(label)
     #trainSet = train_rdd.map(lambda x:Row(label=x[i], features=Vectors.dense(x[15:]))).toDF()
@@ -245,8 +104,12 @@ for i, label in enumerate(label_list):
     whole_flow = Pipeline(stages=[vec_model, gbdt])
     gbdtModel = whole_flow.fit(trainSet)
 
+
+
+
+
 # %%
-# cv 调参
+# cv cross validation code
 def cross_val(train_set):
     #step size is learning rate
     gbdt = GBTClassifier(maxIter=250, maxDepth=10, featuresCol='features', labelCol=label,seed=42)
@@ -284,56 +147,6 @@ def cross_val(train_set):
 
 
 # %%
-#数据准备
-label_list = ['re1']
-train_data = spark.sql("""select * from aie_kfc_cltv.cltv_muti_label_traindata limit 100""") 
-train_data = train_data.select(label_list + data_name_list)
-#train_rdd = train_data.rdd.map(list)
-
-vec_model = VectorAssembler(inputCols=data_name_list, outputCol='features')    
-
-#模型训练
-for i, label in enumerate(label_list):
-    print(label)
-    #trainSet = train_rdd.map(lambda x:Row(label=x[i], features=Vectors.dense(x[15:]))).toDF()
-    #负采样 按正样本与负样本2:3的比例负采样
-    pos_num = train_data.filter(fn.col(label) == 1).count()
-    neg_num = train_data.filter(fn.col(label) == 0).count()
-    prob = 1.5 * pos_num / (neg_num + 1e-6)
-    trainSet = train_data.filter(fn.col(label) == 1).unionAll(train_data.filter(fn.col(label)==0).\
-        withColumn('rand', fn.rand()).filter(fn.col('rand') <= prob).drop('rand'))
-
-    #step size is learning rate
-    gbdt = GBTClassifier(maxIter=250, maxDepth=10, featuresCol='features', labelCol="re1",seed=42)
-
-
-
-
-# %%
-label_list = ['re1']
-train_data = spark.sql("""select * from aie_kfc_cltv.cltv_muti_label_traindata limit 100""") 
-train_data = train_data.select(label_list + data_name_list)
-#train_rdd = train_data.rdd.map(list)
-
-vec_model = VectorAssembler(inputCols=data_name_list, outputCol='features')
-
-#模型训练
-for i, label in enumerate(label_list):
-    print(label)
-    #trainSet = train_rdd.map(lambda x:Row(label=x[i], features=Vectors.dense(x[15:]))).toDF()
-    #负采样 按正样本与负样本2:3的比例负采样
-    pos_num = train_data.filter(fn.col(label) == 1).count()
-    neg_num = train_data.filter(fn.col(label) == 0).count()
-    prob = 1.5 * pos_num / (neg_num + 1e-6)
-    trainSet = train_data.filter(fn.col(label) == 1).unionAll(train_data.filter(fn.col(label)==0).\
-        withColumn('rand', fn.rand()).filter(fn.col('rand') <= prob).drop('rand'))
-
-    trainSet_data = vec_model.transform(trainSet)
-
-# %%
-
-
-# %%
 from pyspark.sql import SparkSession
 from pyspark.ml import Pipeline
 from pyspark.ml.classification import GBTClassifier
@@ -344,7 +157,7 @@ from pyspark.ml.evaluation import BinaryClassificationEvaluator
 
 
 def GBDT_cv():
-     #数据准备
+     #data sampling
     label_list = ['re1']
     train_data = spark.sql("""select * from aie_kfc_cltv.cltv_muti_label_traindata limit 100""") 
     train_data = train_data.select(label_list + data_name_list)
@@ -352,11 +165,11 @@ def GBDT_cv():
 
     vec_model = VectorAssembler(inputCols=data_name_list, outputCol='features')
 
-    #模型训练
+    #model training 
     for i, label in enumerate(label_list):
         print(label)
         #trainSet = train_rdd.map(lambda x:Row(label=x[i], features=Vectors.dense(x[15:]))).toDF()
-        #负采样 按正样本与负样本2:3的比例负采样
+        #negative sampling 2:3
         pos_num = train_data.filter(fn.col(label) == 1).count()
         neg_num = train_data.filter(fn.col(label) == 0).count()
         prob = 1.5 * pos_num / (neg_num + 1e-6)

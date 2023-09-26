@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# # GBDT模型取重要特征值
+# The file is originally in ipynb jupyter notebook file. It is coverted into py file.
+# # GBDT model obtain feature importance and model explanation
 
-# In[5]:
 
 
-#导入包
+#import
 import numpy as np
 import matplotlib.pyplot as plt
 import sklearn
@@ -24,16 +24,10 @@ import shap
 
 
 
-# In[3]:
-
-
 get_ipython().system(u'source activate python37 && pip3 install fastparquet -i https://pypi.douban.com/simple')
 
 
-# ## GBDT 模型定义以及调参
-
-# In[10]:
-
+# ## GBDT cv function
 
 
 #define gbdt for CV to choose learning rate and max_depth_trees
@@ -101,14 +95,9 @@ def best_parameter(cv_results):
     return cv_results[largest_ind]
 
 
-# In[139]:
-
 
 
 def lgb_train_function(X_train, y_train, X_test, y_test, learning_rate=0.05, max_depth_tree=None, num_tree = 100,return_pred=False, print_plot = False, threshold = 0.5):
-    #初始化lgb数据
-    #X_tr, X_te, y_tr, y_te = train_test_split(X_train,y_train,test_size = 0.25, random_state = 111)
-
     #lgb_train_train = lgb.Dataset(X_tr, y_tr, free_raw_data = False)
     #lgb_train_test = lgb.Dataset(X_te, y_te, free_raw_data = False)
     lgb_train = lgb.Dataset(X_train, y_train, free_raw_data=False)
@@ -117,7 +106,7 @@ def lgb_train_function(X_train, y_train, X_test, y_test, learning_rate=0.05, max
     #define some parameters
     _,num_feature =X_train.shape
 
-    #初始化parameter
+    #initialize parameter
     if max_depth_tree is None:
         num_leaves_val = 31
     else:
@@ -136,10 +125,10 @@ def lgb_train_function(X_train, y_train, X_test, y_test, learning_rate=0.05, max
         'max_depth': max_depth_tree
     }
 
-    #显示feature的名字
+    #feature name
     feature_name = ['feature_' + str(col) for col in range(num_feature)]
 
-    #训练
+    #train
     print('开始训练...')
     eval_result = {}
     gbm = lgb.train(params,
@@ -243,8 +232,6 @@ def sharpley_value(model, X_test, X, importance_plot = False, shap_force_plot = 
 
 
 
-# In[13]:
-
 
 def select_threshold_val(X_train, y_train, X_test, y_test, model):
     #define threshold value which above it will be classified as 1
@@ -280,150 +267,14 @@ def select_threshold_val(X_train, y_train, X_test, y_test, model):
 
 
 
-# ## 1.  100天可召回作为y值
-
-# In[51]:
-
-
-#import table
-from nbsdk import get_table, get_pandas
-table_all = get_table('8c634b8e-674c-4093-add7-8c879ed6f4a9/sx_churn_feature_larger.table')
-df_all = table_all.to_pandas()
-
-X_tmp_return,y_return = df_all.iloc[:,:-4], df_all.iloc[:,-2]
-X_return = pd.get_dummies(X_tmp_return)
-X_train_return, X_test_return, y_train_return, y_test_return = train_test_split(X_return,y_return,test_size = 0.25, random_state = 1)
-scaler = preprocessing.StandardScaler().fit(X_train_return)
-X_train_return = scaler.transform(X_train_return)
-X_test_return = scaler.transform(X_test_return)
-
-
-# In[79]:
-
-
-#CV调参
-cv_res_return = cross_val_gbm(X_train_return, y_train_return)
-
-
-# In[94]:
-
-
-#根据调参训练模型
-opt_pair_return=best_parameter(cv_res_return)
-gbm_return = lgb_train_function(X_train_return, y_train_return, X_test_return, y_test_return, learning_rate = opt_pair_return[0], max_depth_tree = opt_pair_return[1],num_tree = 500)
-feature_importance(gbm_return, X_return)
-
-
-# In[91]:
-
-
-#改变threshold值
-select_threshold_val(X_train_return, y_train_return, X_test_return, y_test_return,gbm_return)
-
-
-# In[58]:
-
-
-#特征重要性
-sharpley_value(gbm_return, X_test_return, X_return,importance_plot = True)
-
-
-# ## 2.  上次订单100天前作为y值
-
-# In[43]:
-
-
-X_tmp_100_nonrecall,y_100_nonrecall = df_all.iloc[:,:-4], df_all.iloc[:,-4]
-X_100_nonrecall = pd.get_dummies(X_tmp_100_nonrecall)
-X_train_100_nonrecall, X_test_100_nonrecall, y_train_100_nonrecall, y_test_100_nonrecall = train_test_split(X_100_nonrecall,y_100_nonrecall,test_size = 0.25, random_state = 1)
-scaler = preprocessing.StandardScaler().fit(X_train_100_nonrecall)
-X_train_100_nonrecall = scaler.transform(X_train_100_nonrecall)
-X_test_100_nonrecall = scaler.transform(X_test_100_nonrecall)
-
-
-# In[44]:
-
-
-cv_res_100_nonrecall = cross_val_gbm(X_train_100_nonrecall, y_train_100_nonrecall)
-
-
-# In[95]:
-
-
-#根据调参训练模型
-opt_pair_100_nonrecall=best_parameter(cv_res_100_nonrecall)
-gbm_100_nonrecall = lgb_train_function(X_train_100_nonrecall, y_train_100_nonrecall, X_test_100_nonrecall, y_test_100_nonrecall, learning_rate = opt_pair_100_nonrecall[0], max_depth_tree = opt_pair_100_nonrecall[1],num_tree = 500)
-feature_importance(gbm_100_nonrecall, X_100_nonrecall)
-
-
-# In[ ]:
-
-
-#特征重要性
-sharpley_value(gbm_100_nonrecall, X_test_100_nonrecall, X_100_nonrecall, importance_plot = True)
-
-
-# In[ ]:
-
-
-
-
-
-# ## 3.  100天可召回作为y值 oversample可召回人数
-
-# In[47]:
-
-
-from nbsdk import get_table, get_pandas
-oversample_table = get_table('b0815750-eb27-431d-9c8e-053581787e25/sx_oversampled_feature_tmp.table')
-df_oversample = oversample_table.to_pandas()
-
-
-X_tmp_oversample,y_oversample = df_oversample.iloc[:,:-4], df_oversample.iloc[:,-2]
-X_oversample = pd.get_dummies(X_tmp_oversample)
-X_train_oversample, X_test_oversample, y_train_oversample, y_test_oversample = train_test_split(X_oversample,y_oversample,test_size = 0.25, random_state = 1)
-scaler = preprocessing.StandardScaler().fit(X_train_oversample)
-X_train_oversample = scaler.transform(X_train_oversample)
-X_test_oversample = scaler.transform(X_test_oversample)
-
-
-# In[48]:
-
-
-cv_res_oversample = cross_val_gbm(X_train_oversample, y_train_oversample)
-
-
-# In[96]:
-
-
-#根据调参训练模型
-opt_pair_oversample=best_parameter(cv_res_oversample)
-gbm_100_oversample = lgb_train_function(X_train_oversample, y_train_oversample, X_test_oversample, y_test_oversample, learning_rate = opt_pair_oversample[0], max_depth_tree = opt_pair_oversample[1],num_tree = 500,threshold = 0.5)
-feature_importance(gbm_100_oversample, X_100_nonrecall)
-
-
-
-# In[92]:
-
-
-lgb_train_function(X_train_oversample, y_train_oversample, X_test_oversample, y_test_oversample, learning_rate = 0.05, max_depth_tree = None,num_tree = 500,threshold = 0.5)
-
-
-# In[60]:
-
-
-#特征重要性
-sharpley_value(gbm_100_oversample, X_test_oversample, X_oversample,importance_plot=True)
-
-
-# ## 5. 加入券信息后
+# ## final version 
 
 # from nbsdk import get_table, get_pandas
 # table_new = get_table('e92229cd-c6a7-4389-8d31-31d3d9970478/churn_feat_diff_final.table')
 # df_new = table_new.to_pandas()
-# 
+ 
 
-# In[427]:
+
 
 
 
@@ -441,7 +292,7 @@ X_train_100_new = scaler.transform(X_train_before_100_new)
 X_test_100_new = scaler.transform(X_test_before_100_new)
 
 
-# In[144]:
+
 
 
 continuous_df = df_new.select_dtypes(include=[int, "int32", float])
@@ -456,23 +307,21 @@ plt.title('Correlation Plot')
 plt.show()
 
 
-# In[146]:
+
 
 
 cv_res_new = cross_val_gbm(X_train_100_new, y_train_100_new)
 
 
-# In[228]:
 
 
-#opt_pair_new=best_parameter(cv_res_new)
+
+
 gbm_100_new = lgb_train_function(X_train_100_new, y_train_100_new, X_test_100_new, y_test_100_new, learning_rate = 0.05, max_depth_tree = None,num_tree = 500,print_plot = True,threshold = 0.5)
 
-#gbm_100_new = lgb_train_function(X_train_100_new, y_train_100_new, X_test_100_new, y_test_100_new, learning_rate = opt_pair_new[0], max_depth_tree = opt_pair_new[1], num_tree = 500,print_plot = True,threshold = 0.5)
 feature_importance(gbm_100_new, X_100_new)
 
 
-# In[229]:
 
 
 explainer_new, shap_values_new = sharpley_value(gbm_100_new, X_test_100_new, X_100_new, importance_plot = True)
@@ -509,10 +358,9 @@ shap_dep_plot_new("ai_redeemed_avg_party_size",4,1)
 shap_dep_plot_new("all_redeemed_avg_party_size",4,1)
 
 
-# In[264]:
 
 
-# shap 绝对值排序
+# shap absolute value ordering
 #shap_abs_avg = [np.sum(abs(shap_values_new[1][:,i]))/len(shap_values_new[1][:,i]) for i in range(len(shap_values_new[1][0,:]))]
 average_shap_values = abs(shap_values_new[1]).mean(axis=0)
 
@@ -528,17 +376,17 @@ pd.set_option('display.max_rows', None)
 df_shap_abs
 
 
-# In[309]:
 
 
-#有ok餐平均shap
+
+#shap value for ok_can user
 ok_can_ind = list(np.where(X_100_new.columns=="if_ok_can"))[0][0]
 select_ind_equal_one = np.where(X_test_before_100_new.iloc[:,ok_can_ind]==1)
 shap_values_new[1][:,ok_can_ind][select_ind_equal_one]
 
 
 
-# In[318]:
+
 
 
 data = {
@@ -571,7 +419,7 @@ plt.boxplot(boxplot_data, labels=list(group_data.keys()))
 # 
 # 
 
-# In[239]:
+
 
 
 shap_dep_plot_new("working_trade_zone",1)
@@ -604,13 +452,13 @@ shap_dep_plot_new("num_coffee_tc",15)
 shap_dep_plot_new("num_ok_can_tc",15)
 
 
-# In[173]:
+
 
 
 X_100_new.columns[160:200]
 
 
-# In[319]:
+
 
 
 feat_ind_1 = list(np.where(X_100_new.columns=="if_ok_can"))[0][0]
@@ -621,7 +469,7 @@ data = {
     }
 df = pd.DataFrame(data)
 
-# Create a dictionary to store the values for each group
+
 group_data = {}
 for group, values in df.groupby('Group')['Values']:
     group_data[group] = values.tolist()
@@ -634,7 +482,7 @@ boxplot_data = list(group_data.values())
 plt.boxplot(boxplot_data, labels=list(group_data.keys()))
 
 
-# In[321]:
+
 
 
 import matplotlib.pyplot as plt
@@ -684,7 +532,7 @@ box_plot("elderly_flag_Y")
 
 
 
-# In[325]:
+
 
 
 box_plot("if_beef_burger")
@@ -693,7 +541,7 @@ box_plot("if_coffee")
 box_plot("if_ok_can")
 
 
-# In[234]:
+
 
 
 def calculate_woe(df):
@@ -731,7 +579,6 @@ print(f'woe value for his_coffee_flag_Y is {woe_feat("his_coffee_flag_Y")}')
 print(f'woe value for elderly_flag_Y is {woe_feat("elderly_flag_Y")}')
 
 
-# In[327]:
 
 
 print(f'woe value for if_beef_burger is {woe_feat("if_beef_burger")}')
@@ -742,19 +589,11 @@ print(f'woe value for if_ok_can is {woe_feat("if_ok_can")}')
 
 
 
-# In[195]:
 
 
 X_100_new.iloc[:,-1]
 
 
-# In[ ]:
-
-
-
-
-
-# In[58]:
 
 
 X_test = np.array(X_test_before_100_new.fillna(-1))
@@ -768,31 +607,28 @@ shap.initjs()
 shap.force_plot(explainer_new.expected_value[1], shap_values_new[1][select_ind[0][0],:], X_test[select_ind[0][0],:], feature_names = X_100_new.columns)
 
 
-# In[59]:
+
 
 
 shap.force_plot(explainer_new.expected_value[1], shap_values_new[1][select_ind[0][3],:], X_test[select_ind[0][3],:], feature_names = X_100_new.columns)
 
 
-# In[80]:
-
 
 df_diff
 
 
-# In[81]:
 
 
 data_column1
 
 
-# In[86]:
+
 
 
 df_diff
 
 
-# In[88]:
+
 
 
 
@@ -853,7 +689,7 @@ ax2.legend(loc='upper right')
 plt.show()
 
 
-# In[140]:
+
 
 
 gbm_100_new, y_pred = lgb_train_function(X_train_100_new, y_train_100_new, X_test_100_new, y_test_100_new, learning_rate = 0.05, max_depth_tree = None,num_tree = 500,return_pred = True,print_plot = True,threshold = 0.5)
@@ -862,7 +698,7 @@ gbm_100_new, y_pred = lgb_train_function(X_train_100_new, y_train_100_new, X_tes
 # ta_diff 和tc_diff都高
 # 
 
-# In[106]:
+
 
 
 X_test = np.array(X_test_before_100_new.fillna(-1))
@@ -876,7 +712,6 @@ select_ind
 shap.force_plot(explainer_new.expected_value[1], shap_values_new[1][select_ind[0][0],:], X_test[select_ind[0][0],:], feature_names = X_100_new.columns)
 
 
-# In[123]:
 
 
 X_test = np.array(X_test_before_100_new.fillna(-1))
@@ -889,10 +724,9 @@ print(f'tc diff is {X_test[select_ind[0][0],redeem_ind]}')
 shap.force_plot(explainer_new.expected_value[1], shap_values_new[1][select_ind[0][0],:], X_test[select_ind[0][0],:], feature_names = X_100_new.columns)
 
 
-# ## 可视化：
+# ## visualization
 # 
 
-# In[533]:
 
 
 #!source activate python37 && pip3 install typing_extensions -i https://pypi.douban.com/simple
@@ -903,14 +737,14 @@ shap.force_plot(explainer_new.expected_value[1], shap_values_new[1][select_ind[0
 #!source activate python37 && pip3 install altair vega_datasets -i https://pypi.douban.com/simple
 
 
-# In[603]:
+
 
 
 get_ipython().system(u'source activate python37 && pip3 install vega==1.4.0 -i https://pypi.douban.com/simple')
 get_ipython().system(u'pip3 install vega==1.4.0')
 
 
-# In[599]:
+
 
 
 #!pip install vega
@@ -919,18 +753,16 @@ get_ipython().system(u'jupyter nbextension install --sys-prefix --py vega')
 #!jupyter nbextension enable vega --py --sys-prefix
 
 
-# In[604]:
 
 
 get_ipython().system(u'pip freeze')
 
 
-# 解决无法import self from typing_extensions
 # import typing_extensions
 # from importlib import reload
 # reload(typing_extensions)
 
-# In[605]:
+
 
 
 import altair as alt
@@ -939,13 +771,11 @@ import vega
 reload(vega)
 
 
-# In[606]:
 
 
 alt.renderers.enable('notebook')
 
 
-# In[689]:
 
 
 from vega_datasets import data
@@ -958,10 +788,8 @@ a = alt.Chart(cars).mark_point().encode(
 #a
 
 
-# In[456]:
 
 
-#要convert to character试
 feat_ind = list(np.where(X_100_new.columns=="num_wechat_tc"))[0][0]
 select_ind =  np.where((X_test_before_100_new.iloc[:,feat_ind]<=10))[0]
 # Sample data with two columns: group and values
@@ -975,14 +803,14 @@ df = pd.DataFrame(data)
 df.to_csv("num_wechat_tc.csv")
 
 
-# In[685]:
+
 
 
 a = pd.read_csv("num_wechat_tc.csv")
 print(list(a['temp_max'])[1:1000])
 
 
-# In[686]:
+
 
 
 step = 20
@@ -1029,7 +857,7 @@ alt.Chart(source, height=step).transform_timeunit(
 )
 
 
-# In[493]:
+
 
 
 step = 20
@@ -1076,8 +904,6 @@ alt.Chart("num_wechat_tc.csv", height=step).transform_joinaggregate(
 
 
 
-# In[ ]:
-
 
 
 alt.Chart("num_wechat_tc.csv", height=step).transform_joinaggregate(
@@ -1119,13 +945,13 @@ alt.Chart("num_wechat_tc.csv", height=step).transform_joinaggregate(
 )
 
 
-# In[478]:
+
 
 
 np.array(X_test_before_100_new.iloc[:,feat_ind])[select_ind]
 
 
-# In[671]:
+
 
 
 import numpy as np
@@ -1185,7 +1011,7 @@ def ridge_plot(feature_name):
 ridge_plot("num_wechat_tc")
 
 
-# In[672]:
+
 
 
 ridge_plot("num_app_tc")
@@ -1195,10 +1021,10 @@ ridge_plot("coffee_tc")
 ridge_plot("ok_can_tc")
 
 
-# In[670]:
 
 
-#均值
+
+#mean
 
 def plot_mean(feature_name):
     feat_ind = list(np.where(X_100_new.columns==feature_name))[0][0]
@@ -1225,21 +1051,13 @@ plot_mean("coffee_tc")
 plot_mean("ok_can_tc")
 
 
-# In[642]:
 
-
-
-
-
-
-
-# In[627]:
 
 
 ridge_plot("num_app_tc")
 
 
-# In[673]:
+
 
 
 sns.set_style('whitegrid')
@@ -1269,4 +1087,3 @@ regression_plot("douyin_redeem_percent")
 regression_plot("meituan_redeem_percent")
 
 
-# In[ ]:
